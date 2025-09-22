@@ -1,3 +1,4 @@
+
 /**
  * This function must add two numbers and return sum of numbers
  * @param a {number|string}
@@ -76,13 +77,14 @@ function makeCounter(currentCount) {
  */
 
 function getAsyncTimerId(time) {
-  let timerId;
-  setTimeout(() => {
-    timerId = Math.floor(Date.now() / 1000)
-  }, time);
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const timerId = Math.floor(Date.now() / 1000);
+      resolve(timerId);
+    }, time);
+  });
+}
 
-  return timerId
-};
 
 /**
  * This function return promise and multiply paraments
