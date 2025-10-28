@@ -1,3 +1,20 @@
+
+
+describe("convertWgs84ToMGRS", function() {
+  it("повинен конвертувати координати Києва у MGRS", function() {
+    // Еталонний результат від бібліотеки mgrs
+    const expected = mgrs.forward([30.5234, 50.4501], 5);
+
+    // Результат від твоєї функції
+    const actual = convertWgs84ToMGRS([30.5234, 50.4501], 5);
+
+    // Перевіряємо
+    chai.assert.equal(actual, expected, "Конвертація повинна збігатися з mgrs.forward()");
+    // Для наочності виведемо в консоль
+    console.log("Київ →", actual);
+  });
+});
+
 describe('sum', () => {
   it('перевірка на додавання позитивних та негативних чисел', () => {
     assert.equal(sum(2, -3), -1);
@@ -412,3 +429,4 @@ describe('httpGet', () => {
   });
 });
 });  
+
