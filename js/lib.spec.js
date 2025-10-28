@@ -1,18 +1,108 @@
-
-
 describe("convertWgs84ToMGRS", function() {
-  it("повинен конвертувати координати Києва у MGRS", function() {
-    // Еталонний результат від бібліотеки mgrs
-    const expected = mgrs.forward([30.5234, 50.4501], 5);
 
-    // Результат від твоєї функції
-    const actual = convertWgs84ToMGRS([30.5234, 50.4501], 5);
+    // ВАЛІДНІ ДАНІ: Стандартні конвертації та точність
 
-    // Перевіряємо
-    chai.assert.equal(actual, expected, "Конвертація повинна збігатися з mgrs.forward()");
-    // Для наочності виведемо в консоль
-    console.log("Київ →", actual);
-  });
+    it("повинен конвертувати координати Києва (центральна точка) у MGRS з точністю 1м", function() {
+        const kyivLL = [30.5234, 50.4501];
+        const expected = mgrs.forward(kyivLL, 5); // 36U YK 75253 58515
+        const actual = convertWgs84ToMGRS(kyivLL, 5);
+        assert.equal(actual, expected, "Конвертація Києва повинна збігатися з mgrs.forward()");
+        console.log("Київ (1м) →", actual);
+    });
+
+    it("повинен використовувати точність за замовчуванням (5) якщо її не вказано", function() {
+        const testLL = [30.5234, 50.4501];
+        const expected = mgrs.forward(testLL, 5);
+        const actual = convertWgs84ToMGRS(testLL); // Без вказівки accuracy
+        assert.equal(actual, expected, "Повинна використовуватись точність 5 за замовчуванням");
+    });
+
+    it("повинен конвертувати координати з точністю 10м (accuracy=4)", function() {
+        const testLL = [4.895168, 52.370216]; // Амстердам
+        const expected = mgrs.forward(testLL, 4); // 31U FM 6271 0500
+        const actual = convertWgs84ToMGRS(testLL, 4);
+        assert.equal(actual, expected, "Конвертація з accuracy=4 повинна бути коректною");
+        console.log("Амстердам (10м) →", actual);
+    });
+
+    it("повинен конвертувати координати з точністю 1км (accuracy=2)", function() {
+        const testLL = [-74.0060, 40.7128]; // Нью-Йорк
+        const expected = mgrs.forward(testLL, 2); // 18T WL 80 43
+        const actual = convertWgs84ToMGRS(testLL, 2);
+        assert.equal(actual, expected, "Конвертація з accuracy=2 повинна бути коректною");
+        console.log("Нью-Йорк (1км) →", actual);
+    });
+
+    // ОБРОБКА ПОМИЛОК: Невалідні вхідні дані
+
+    it("повинен викинути TypeError, якщо вхідні дані не є масивом", function() {
+        assert.throws(() => {
+            convertWgs84ToMGRS("не масив");
+        }, TypeError, 'forward did not receive an array', "Помилка при не-масиві");
+    });
+
+    it("повинен викинути TypeError, якщо масив містить рядки", function() {
+        assert.throws(() => {
+            convertWgs84ToMGRS(["30.5234", 50.4501]);
+        }, TypeError, 'received an array of strings', "Помилка при рядках");
+    });
+
+    // ОБРОБКА ПОМИЛОК: Невалідні значення широти/довготи
+
+    it("повинен викинути TypeError для невалідного значення довготи (> 180)", function() {
+        assert.throws(() => {
+            convertWgs84ToMGRS([180.0001, 50]);
+        }, TypeError, 'invalid longitude', "Помилка при lon > 180");
+    });
+
+    it("повинен викинути TypeError для невалідного значення довготи (< -180)", function() {
+        assert.throws(() => {
+            convertWgs84ToMGRS([-180.0001, 50]);
+        }, TypeError, 'invalid longitude', "Помилка при lon < -180");
+    });
+
+    it("повинен викинути TypeError для невалідного значення широти (> 90)", function() {
+        assert.throws(() => {
+            convertWgs84ToMGRS([30, 90.0001]);
+        }, TypeError, 'invalid latitude', "Помилка при lat > 90");
+    });
+
+    // ОБРОБКА ПОМИЛОК: Полярні регіони (обмеження бібліотеки)
+
+    it("повинен викинути TypeError для широти вище 84°N", function() {
+        assert.throws(() => {
+            convertWgs84ToMGRS([0, 84.0000001]);
+        }, TypeError, 'polar regions', "Помилка при lat > 84");
+    });
+
+    it("повинен викинути TypeError для широти нижче 80°S", function() {
+        assert.throws(() => {
+            convertWgs84ToMGRS([0, -80.0000001]);
+        }, TypeError, 'polar regions', "Помилка при lat < -80");
+    });
+    
+    // КРАЙНІ ЗНАЧЕННЯ: Кордони системи
+
+    it("повинен коректно обробляти координати на екваторі (lat=0)", function() {
+        const testLL = [30, 0];
+        const expected = mgrs.forward(testLL, 5); // 36N TL 50000 00000
+        const actual = convertWgs84ToMGRS(testLL, 5);
+        assert.equal(actual, expected, "Конвертація на екваторі");
+    });
+
+    it("повинен коректно обробляти максимальну широту (lat=84)", function() {
+        const testLL = [30, 84];
+        const expected = mgrs.forward(testLL, 5); // 36X VF 50000 00000
+        const actual = convertWgs84ToMGRS(testLL, 5);
+        assert.equal(actual, expected, "Конвертація на кордоні 84°N");
+    });
+
+    it("повинен коректно обробляти мінімальну широту (lat=-80)", function() {
+        const testLL = [30, -80];
+        const expected = mgrs.forward(testLL, 5); // 36C TV 50000 00000
+        const actual = convertWgs84ToMGRS(testLL, 5);
+        assert.equal(actual, expected, "Конвертація на кордоні 80°S");
+    });
 });
 
 describe('sum', () => {
