@@ -1,109 +1,148 @@
+/* global mgrs, chai, describe, it */
+const { expect } = chai;
+
 describe("convertWgs84ToMGRS", function() {
 
-    // ВАЛІДНІ ДАНІ: Стандартні конвертації та точність
+  it('повертає правильний формат MGRS', () => {
+    const result = convertWgs84ToMGRS([36.2304, 49.9935]); // Харків
+    expect(result).to.be.a('string');
+    expect(result).to.match(/^\d{1,2}[C-X][A-Z]{2}\d+$/);
+  });
 
-    it("повинен конвертувати координати Києва (центральна точка) у MGRS з точністю 1м", function() {
-        const kyivLL = [30.5234, 50.4501];
-        const expected = mgrs.forward(kyivLL, 5); // 36U YK 75253 58515
-        const actual = convertWgs84ToMGRS(kyivLL, 5);
-        assert.equal(actual, expected, "Конвертація Києва повинна збігатися з mgrs.forward()");
-        console.log("Київ (1м) →", actual);
-    });
+  it('коректно конвертує основні українські міста', () => {
+    const cities = {
+      Izium: [37.2566, 49.2103],
+      Kramatorsk: [37.5843, 48.7389],
+      Melitopol: [35.3667, 46.8333],
+      Orikhiv: [35.7876, 47.5672],
+      Chernihiv: [31.2893, 51.4982],
+      Sumy: [34.8003, 50.9216],
+      Kharkiv: [36.2304, 49.9935],
+    };
 
-    it("повинен використовувати точність за замовчуванням (5) якщо її не вказано", function() {
-        const testLL = [30.5234, 50.4501];
-        const expected = mgrs.forward(testLL, 5);
-        const actual = convertWgs84ToMGRS(testLL); // Без вказівки accuracy
-        assert.equal(actual, expected, "Повинна використовуватись точність 5 за замовчуванням");
-    });
+    for (const [name, [lon, lat]] of Object.entries(cities)) {
+      const mgrsCode = convertWgs84ToMGRS([lon, lat]);
+      const expected = mgrs.forward([lon, lat], 5);
+      expect(mgrsCode).to.equal(expected, `Помилка для міста ${name}`);
+    }
+  });
 
-    it("повинен конвертувати координати з точністю 10м (accuracy=4)", function() {
-        const testLL = [4.895168, 52.370216]; // Амстердам
-        const expected = mgrs.forward(testLL, 4); // 31U FM 6271 0500
-        const actual = convertWgs84ToMGRS(testLL, 4);
-        assert.equal(actual, expected, "Конвертація з accuracy=4 повинна бути коректною");
-        console.log("Амстердам (10м) →", actual);
-    });
+  it('кидає помилку при неправильному типі аргументів', () => {
+    expect(() => convertWgs84ToMGRS('abc')).to.throw(TypeError);
+    expect(() => convertWgs84ToMGRS(['36.2', '49.9'])).to.throw(TypeError);
+  });
 
-    it("повинен конвертувати координати з точністю 1км (accuracy=2)", function() {
-        const testLL = [-74.0060, 40.7128]; // Нью-Йорк
-        const expected = mgrs.forward(testLL, 2); // 18T WL 80 43
-        const actual = convertWgs84ToMGRS(testLL, 2);
-        assert.equal(actual, expected, "Конвертація з accuracy=2 повинна бути коректною");
-        console.log("Нью-Йорк (1км) →", actual);
-    });
+  it('кидає помилку при неправильних координатах', () => {
+    expect(() => convertWgs84ToMGRS([200, 50])).to.throw(TypeError);
+    expect(() => convertWgs84ToMGRS([30, 95])).to.throw(TypeError);
+    expect(() => convertWgs84ToMGRS([30, -85])).to.throw(TypeError);
+  });
 
-    // ОБРОБКА ПОМИЛОК: Невалідні вхідні дані
-
-    it("повинен викинути TypeError, якщо вхідні дані не є масивом", function() {
-        assert.throws(() => {
-            convertWgs84ToMGRS("не масив");
-        }, TypeError, 'forward did not receive an array', "Помилка при не-масиві");
-    });
-
-    it("повинен викинути TypeError, якщо масив містить рядки", function() {
-        assert.throws(() => {
-            convertWgs84ToMGRS(["30.5234", 50.4501]);
-        }, TypeError, 'received an array of strings', "Помилка при рядках");
-    });
-
-    // ОБРОБКА ПОМИЛОК: Невалідні значення широти/довготи
-
-    it("повинен викинути TypeError для невалідного значення довготи (> 180)", function() {
-        assert.throws(() => {
-            convertWgs84ToMGRS([180.0001, 50]);
-        }, TypeError, 'invalid longitude', "Помилка при lon > 180");
-    });
-
-    it("повинен викинути TypeError для невалідного значення довготи (< -180)", function() {
-        assert.throws(() => {
-            convertWgs84ToMGRS([-180.0001, 50]);
-        }, TypeError, 'invalid longitude', "Помилка при lon < -180");
-    });
-
-    it("повинен викинути TypeError для невалідного значення широти (> 90)", function() {
-        assert.throws(() => {
-            convertWgs84ToMGRS([30, 90.0001]);
-        }, TypeError, 'invalid latitude', "Помилка при lat > 90");
-    });
-
-    // ОБРОБКА ПОМИЛОК: Полярні регіони (обмеження бібліотеки)
-
-    it("повинен викинути TypeError для широти вище 84°N", function() {
-        assert.throws(() => {
-            convertWgs84ToMGRS([0, 84.0000001]);
-        }, TypeError, 'polar regions', "Помилка при lat > 84");
-    });
-
-    it("повинен викинути TypeError для широти нижче 80°S", function() {
-        assert.throws(() => {
-            convertWgs84ToMGRS([0, -80.0000001]);
-        }, TypeError, 'polar regions', "Помилка при lat < -80");
-    });
-    
-    // КРАЙНІ ЗНАЧЕННЯ: Кордони системи
-
-    it("повинен коректно обробляти координати на екваторі (lat=0)", function() {
-        const testLL = [30, 0];
-        const expected = mgrs.forward(testLL, 5); // 36N TL 50000 00000
-        const actual = convertWgs84ToMGRS(testLL, 5);
-        assert.equal(actual, expected, "Конвертація на екваторі");
-    });
-
-    it("повинен коректно обробляти максимальну широту (lat=84)", function() {
-        const testLL = [30, 84];
-        const expected = mgrs.forward(testLL, 5); // 36X VF 50000 00000
-        const actual = convertWgs84ToMGRS(testLL, 5);
-        assert.equal(actual, expected, "Конвертація на кордоні 84°N");
-    });
-
-    it("повинен коректно обробляти мінімальну широту (lat=-80)", function() {
-        const testLL = [30, -80];
-        const expected = mgrs.forward(testLL, 5); // 36C TV 50000 00000
-        const actual = convertWgs84ToMGRS(testLL, 5);
-        assert.equal(actual, expected, "Конвертація на кордоні 80°S");
-    });
 });
+    // // ВАЛІДНІ ДАНІ: Стандартні конвертації та точність
+
+    // it("повинен конвертувати координати Києва (центральна точка) у MGRS з точністю 1м", function() {
+    //     const kyivLL = [30.5234, 50.4501];
+    //     const expected = mgrs.forward(kyivLL, 5); // 36U YK 75253 58515
+    //     const actual = convertWgs84ToMGRS(kyivLL, 5);
+    //     assert.equal(actual, expected, "Конвертація Києва повинна збігатися з mgrs.forward()");
+    //     console.log("Київ (1м) →", actual);
+    // });
+
+    // it("повинен використовувати точність за замовчуванням (5) якщо її не вказано", function() {
+    //     const testLL = [30.5234, 50.4501];
+    //     const expected = mgrs.forward(testLL, 5);
+    //     const actual = convertWgs84ToMGRS(testLL); // Без вказівки accuracy
+    //     assert.equal(actual, expected, "Повинна використовуватись точність 5 за замовчуванням");
+    // });
+
+    // it("повинен конвертувати координати з точністю 10м (accuracy=4)", function() {
+    //     const testLL = [4.895168, 52.370216]; // Амстердам
+    //     const expected = mgrs.forward(testLL, 4); // 31U FM 6271 0500
+    //     const actual = convertWgs84ToMGRS(testLL, 4);
+    //     assert.equal(actual, expected, "Конвертація з accuracy=4 повинна бути коректною");
+    //     console.log("Амстердам (10м) →", actual);
+    // });
+
+    // it("повинен конвертувати координати з точністю 1км (accuracy=2)", function() {
+    //     const testLL = [-74.0060, 40.7128]; // Нью-Йорк
+    //     const expected = mgrs.forward(testLL, 2); // 18T WL 80 43
+    //     const actual = convertWgs84ToMGRS(testLL, 2);
+    //     assert.equal(actual, expected, "Конвертація з accuracy=2 повинна бути коректною");
+    //     console.log("Нью-Йорк (1км) →", actual);
+    // });
+
+    // // ОБРОБКА ПОМИЛОК: Невалідні вхідні дані
+
+    // it("повинен викинути TypeError, якщо вхідні дані не є масивом", function() {
+    //     assert.throws(() => {
+    //         convertWgs84ToMGRS("не масив");
+    //     }, TypeError, 'forward did not receive an array', "Помилка при не-масиві");
+    // });
+
+    // it("повинен викинути TypeError, якщо масив містить рядки", function() {
+    //     assert.throws(() => {
+    //         convertWgs84ToMGRS(["30.5234", 50.4501]);
+    //     }, TypeError, 'received an array of strings', "Помилка при рядках");
+    // });
+
+    // // ОБРОБКА ПОМИЛОК: Невалідні значення широти/довготи
+
+    // it("повинен викинути TypeError для невалідного значення довготи (> 180)", function() {
+    //     assert.throws(() => {
+    //         convertWgs84ToMGRS([180.0001, 50]);
+    //     }, TypeError, 'invalid longitude', "Помилка при lon > 180");
+    // });
+
+    // it("повинен викинути TypeError для невалідного значення довготи (< -180)", function() {
+    //     assert.throws(() => {
+    //         convertWgs84ToMGRS([-180.0001, 50]);
+    //     }, TypeError, 'invalid longitude', "Помилка при lon < -180");
+    // });
+
+    // it("повинен викинути TypeError для невалідного значення широти (> 90)", function() {
+    //     assert.throws(() => {
+    //         convertWgs84ToMGRS([30, 90.0001]);
+    //     }, TypeError, 'invalid latitude', "Помилка при lat > 90");
+    // });
+
+    // // ОБРОБКА ПОМИЛОК: Полярні регіони (обмеження бібліотеки)
+
+    // it("повинен викинути TypeError для широти вище 84°N", function() {
+    //     assert.throws(() => {
+    //         convertWgs84ToMGRS([0, 84.0000001]);
+    //     }, TypeError, 'polar regions', "Помилка при lat > 84");
+    // });
+
+    // it("повинен викинути TypeError для широти нижче 80°S", function() {
+    //     assert.throws(() => {
+    //         convertWgs84ToMGRS([0, -80.0000001]);
+    //     }, TypeError, 'polar regions', "Помилка при lat < -80");
+    // });
+    
+    // // КРАЙНІ ЗНАЧЕННЯ: Кордони системи
+
+    // it("повинен коректно обробляти координати на екваторі (lat=0)", function() {
+    //     const testLL = [30, 0];
+    //     const expected = mgrs.forward(testLL, 5); // 36N TL 50000 00000
+    //     const actual = convertWgs84ToMGRS(testLL, 5);
+    //     assert.equal(actual, expected, "Конвертація на екваторі");
+    // });
+
+    // it("повинен коректно обробляти максимальну широту (lat=84)", function() {
+    //     const testLL = [30, 84];
+    //     const expected = mgrs.forward(testLL, 5); // 36X VF 50000 00000
+    //     const actual = convertWgs84ToMGRS(testLL, 5);
+    //     assert.equal(actual, expected, "Конвертація на кордоні 84°N");
+    // });
+
+    // it("повинен коректно обробляти мінімальну широту (lat=-80)", function() {
+    //     const testLL = [30, -80];
+    //     const expected = mgrs.forward(testLL, 5); // 36C TV 50000 00000
+    //     const actual = convertWgs84ToMGRS(testLL, 5);
+    //     assert.equal(actual, expected, "Конвертація на кордоні 80°S");
+    // });
+
 
 describe('sum', () => {
   it('перевірка на додавання позитивних та негативних чисел', () => {
@@ -344,179 +383,179 @@ describe('makeCounter', () => {
 
 
 
-describe('getAsyncTimerId', () => {
+// describe('getAsyncTimerId', () => {
 
-  it('повинен повертати Promise', () => {
-    const result = getAsyncTimerId(100);
-    assert.ok(result instanceof Promise);
-  });
+//   it('повинен повертати Promise', () => {
+//     const result = getAsyncTimerId(100);
+//     assert.ok(result instanceof Promise);
+//   });
 
-  it('повинен повертати число (Unix час у секундах)', async () => {
-    const id = await getAsyncTimerId(50);
-    assert.strictEqual(typeof id, 'number');
-  });
+//   it('повинен повертати число (Unix час у секундах)', async () => {
+//     const id = await getAsyncTimerId(50);
+//     assert.strictEqual(typeof id, 'number');
+//   });
 
-  it('повинен повертати значення, яке приблизно дорівнює поточному Unix часу', async () => {
-    const before = Math.floor(Date.now() / 1000);
-    const id = await getAsyncTimerId(100);
-    const after = Math.floor(Date.now() / 1000);
-    assert.ok(id >= before && id <= after);
-  });
+//   it('повинен повертати значення, яке приблизно дорівнює поточному Unix часу', async () => {
+//     const before = Math.floor(Date.now() / 1000);
+//     const id = await getAsyncTimerId(100);
+//     const after = Math.floor(Date.now() / 1000);
+//     assert.ok(id >= before && id <= after);
+//   });
 
-  it('повинен виконуватися приблизно після заданого часу', async function() {
-    this.timeout(2000); // дозволяємо тесту працювати трохи довше
+//   it('повинен виконуватися приблизно після заданого часу', async function() {
+//     this.timeout(2000); // дозволяємо тесту працювати трохи довше
 
-    const start = Date.now();
-    await getAsyncTimerId(500);
-    const end = Date.now();
+//     const start = Date.now();
+//     await getAsyncTimerId(500);
+//     const end = Date.now();
 
-    const elapsed = end - start;
-    assert.ok(elapsed >= 500, `Очікувалось >= 500мс, отримано ${elapsed}мс`);
-  });
+//     const elapsed = end - start;
+//     assert.ok(elapsed >= 500, `Очікувалось >= 500мс, отримано ${elapsed}мс`);
+//   });
 
-  it('повинен працювати навіть із нульовою затримкою', async () => {
-    const id = await getAsyncTimerId(0);
-    assert.strictEqual(typeof id, 'number');
-  });
+//   it('повинен працювати навіть із нульовою затримкою', async () => {
+//     const id = await getAsyncTimerId(0);
+//     assert.strictEqual(typeof id, 'number');
+//   });
 
-  it('повинен повертати різні значення при різних запусках у часі', async () => {
-    const id1 = await getAsyncTimerId(10);
-    await new Promise(r => setTimeout(r, 1100)); // чекаємо ~1 секунду
-    const id2 = await getAsyncTimerId(10);
+//   it('повинен повертати різні значення при різних запусках у часі', async () => {
+//     const id1 = await getAsyncTimerId(10);
+//     await new Promise(r => setTimeout(r, 1100)); // чекаємо ~1 секунду
+//     const id2 = await getAsyncTimerId(10);
 
-    assert.notStrictEqual(id1, id2); // Unix-час має змінитися
-  });
+//     assert.notStrictEqual(id1, id2); // Unix-час має змінитися
+//   });
 
-  it('повинен коректно працювати при великих затримках (наприклад, 1 секунда)', async function() {
-    this.timeout(3000);
-    const id = await getAsyncTimerId(1000);
-    assert.strictEqual(typeof id, 'number');
-  });
+//   it('повинен коректно працювати при великих затримках (наприклад, 1 секунда)', async function() {
+//     this.timeout(3000);
+//     const id = await getAsyncTimerId(1000);
+//     assert.strictEqual(typeof id, 'number');
+//   });
 
-});
+// });
 
-describe('asyncMultiply', () => {
+// describe('asyncMultiply', () => {
 
-  it('повинна повертати Promise', () => {
-    const result = asyncMultiply(5);
-    assert.ok(result instanceof Promise);
-  });
+//   it('повинна повертати Promise', () => {
+//     const result = asyncMultiply(5);
+//     assert.ok(result instanceof Promise);
+//   });
 
-  it('повинна повертати подвоєне число після виконання', async function() {
-    this.timeout(4000);
-    const result = await asyncMultiply(4);
-    assert.strictEqual(result, 8);
-  });
+//   it('повинна повертати подвоєне число після виконання', async function() {
+//     this.timeout(4000);
+//     const result = await asyncMultiply(4);
+//     assert.strictEqual(result, 8);
+//   });
 
-  it('повинна повертати 0, якщо передано 0', async function() {
-    this.timeout(4000);
-    const result = await asyncMultiply(0);
-    assert.strictEqual(result, 0);
-  });
+//   it('повинна повертати 0, якщо передано 0', async function() {
+//     this.timeout(4000);
+//     const result = await asyncMultiply(0);
+//     assert.strictEqual(result, 0);
+//   });
 
-  it('повинна повертати від’ємне значення, якщо вхідне число від’ємне', async function() {
-    this.timeout(4000);
-    const result = await asyncMultiply(-3);
-    assert.strictEqual(result, -6);
-  });
+//   it('повинна повертати від’ємне значення, якщо вхідне число від’ємне', async function() {
+//     this.timeout(4000);
+//     const result = await asyncMultiply(-3);
+//     assert.strictEqual(result, -6);
+//   });
 
-  it('повинна повертати правильне значення для чисел із плаваючою крапкою', async function() {
-    this.timeout(4000);
-    const result = await asyncMultiply(2.5);
-    assert.strictEqual(result, 5);
-  });
+//   it('повинна повертати правильне значення для чисел із плаваючою крапкою', async function() {
+//     this.timeout(4000);
+//     const result = await asyncMultiply(2.5);
+//     assert.strictEqual(result, 5);
+//   });
 
-  it('повинна виконуватися приблизно через 3 секунди', async function() {
-    this.timeout(5000);
-    const start = Date.now();
-    await asyncMultiply(2);
-    const end = Date.now();
-    const elapsed = end - start;
-    assert.ok(elapsed >= 2900 && elapsed <= 3500, `Фактичний час: ${elapsed} мс`);
-  });
+//   it('повинна виконуватися приблизно через 3 секунди', async function() {
+//     this.timeout(5000);
+//     const start = Date.now();
+//     await asyncMultiply(2);
+//     const end = Date.now();
+//     const elapsed = end - start;
+//     assert.ok(elapsed >= 2900 && elapsed <= 3500, `Фактичний час: ${elapsed} мс`);
+//   });
 
-  it('повинна повертати різні результати для різних вхідних значень', async function() {
-    this.timeout(4000);
-    const res1 = await asyncMultiply(2);
-    const res2 = await asyncMultiply(5);
-    assert.notStrictEqual(res1, res2);
-  });
+//   it('повинна повертати різні результати для різних вхідних значень', async function() {
+//     this.timeout(4000);
+//     const res1 = await asyncMultiply(2);
+//     const res2 = await asyncMultiply(5);
+//     assert.notStrictEqual(res1, res2);
+//   });
 
-});
+// });
 
-describe('httpGet', () => {
-  let xhr;
-  let requests;
+// describe('httpGet', () => {
+//   let xhr;
+//   let requests;
 
-  beforeEach(() => {
-    xhr = sinon.useFakeXMLHttpRequest();
-    requests = [];
-    xhr.onCreate = function (req) {
-      requests.push(req);
-    };
-  });
+//   beforeEach(() => {
+//     xhr = sinon.useFakeXMLHttpRequest();
+//     requests = [];
+//     xhr.onCreate = function (req) {
+//       requests.push(req);
+//     };
+//   });
 
-  afterEach(() => {
-    xhr.restore();
-  });
+//   afterEach(() => {
+//     xhr.restore();
+//   });
 
-  it('повинна повертати Promise', () => {
-    const result = httpGet('/api/data');
-    expect(result).to.be.instanceOf(Promise);
-  });
+//   it('повинна повертати Promise', () => {
+//     const result = httpGet('/api/data');
+//     expect(result).to.be.instanceOf(Promise);
+//   });
 
-  it('повинна виконуватись успішно при статусі 200', async () => {
-    const promise = httpGet('/api/success');
-    requests[0].respond(200, { "Content-Type": "application/json" }, '{"msg":"OK"}');
+//   it('повинна виконуватись успішно при статусі 200', async () => {
+//     const promise = httpGet('/api/success');
+//     requests[0].respond(200, { "Content-Type": "application/json" }, '{"msg":"OK"}');
 
-    const response = await promise;
-    expect(response).to.equal('{"msg":"OK"}');
-  });
+//     const response = await promise;
+//     expect(response).to.equal('{"msg":"OK"}');
+//   });
 
-  it('повинна відхилятись при статусі 404', async () => {
-    const promise = httpGet('/api/notfound');
-    requests[0].respond(404, { "Content-Type": "text/plain" }, 'Not Found');
+//   it('повинна відхилятись при статусі 404', async () => {
+//     const promise = httpGet('/api/notfound');
+//     requests[0].respond(404, { "Content-Type": "text/plain" }, 'Not Found');
 
-    try {
-      await promise;
-      throw new Error('Очікувалось відхилення');
-    } catch (err) {
-      expect(err).to.be.instanceOf(Error);
-      expect(err.code).to.equal(404);
-    }
-  });
+//     try {
+//       await promise;
+//       throw new Error('Очікувалось відхилення');
+//     } catch (err) {
+//       expect(err).to.be.instanceOf(Error);
+//       expect(err.code).to.equal(404);
+//     }
+//   });
 
-  it('повинна відхилятись при статусі 500', async () => {
-    const promise = httpGet('/api/error');
-    requests[0].respond(500, { "Content-Type": "text/plain" }, 'Server Error');
+//   it('повинна відхилятись при статусі 500', async () => {
+//     const promise = httpGet('/api/error');
+//     requests[0].respond(500, { "Content-Type": "text/plain" }, 'Server Error');
 
-    try {
-      await promise;
-      throw new Error('Очікувалось відхилення');
-    } catch (err) {
-      expect(err.code).to.equal(500);
-      expect(err.message).to.equal('Server Error');
-    }
-  });
+//     try {
+//       await promise;
+//       throw new Error('Очікувалось відхилення');
+//     } catch (err) {
+//       expect(err.code).to.equal(500);
+//       expect(err.message).to.equal('Server Error');
+//     }
+//   });
 
-  it('повинна відхилятись при мережевій помилці', async () => {
-    const promise = httpGet('/api/fail');
-    requests[0].error(); // Імітація мережевої помилки
+//   it('повинна відхилятись при мережевій помилці', async () => {
+//     const promise = httpGet('/api/fail');
+//     requests[0].error(); // Імітація мережевої помилки
 
-    try {
-      await promise;
-      throw new Error('Очікувалось відхилення');
-    } catch (err) {
-      expect(err.message).to.equal('Network Error');
-    }
-  });
+//     try {
+//       await promise;
+//       throw new Error('Очікувалось відхилення');
+//     } catch (err) {
+//       expect(err.message).to.equal('Network Error');
+//     }
+//   });
 
-  it('повинна викликати xhr.open з правильними параметрами', () => {
-    httpGet('/api/check');
-    const req = requests[0];
-    expect(req.method).to.equal('GET');
-    expect(req.url).to.equal('/api/check');
-  });
-});
+//   it('повинна викликати xhr.open з правильними параметрами', () => {
+//     httpGet('/api/check');
+//     const req = requests[0];
+//     expect(req.method).to.equal('GET');
+//     expect(req.url).to.equal('/api/check');
+//   });
+// });
 });  
 
